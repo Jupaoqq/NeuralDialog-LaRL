@@ -37,9 +37,9 @@ def record_task(n_epsd, model, val_data, config, ppl_f, dialog, ctx_gen_eval, rl
     record_rl_task(n_epsd, dialog, ctx_gen_eval, rl_f)
 
 
-def record(n_epsd, model, val_data, sv_config, lm_model, ppl_f, dialog, ctx_gen_eval, rl_f):
+def record(n_epsd, model, val_data, sv_config, lm_model, ppl_f, dialog, ctx_gen_eval, rl_f, entity):
     record_ppl_with_lm(n_epsd, model, val_data, sv_config, lm_model, ppl_f)
-    record_rl(n_epsd, dialog, ctx_gen_eval, rl_f)
+    record_rl(n_epsd, dialog, ctx_gen_eval, rl_f, entity)
 
 
 def record_ppl_with_lm(n_epsd, model, data, config, lm_model, ppl_f):
@@ -113,7 +113,7 @@ def record_ppl(n_epsd, model, val_data, config, ppl_f):
     model.train()
 
 
-def record_rl(n_epsd, dialog, ctx_gen, rl_f):
+def record_rl(n_epsd, dialog, ctx_gen, rl_f, entity):
     conv_list = []
     reward_list = []
     agree_list = []
@@ -121,7 +121,7 @@ def record_rl(n_epsd, dialog, ctx_gen, rl_f):
     word_metric = UniquenessWordMetric()
 
     for ctxs in ctx_gen.ctxs:
-        conv, agree, rewards = dialog.run(ctxs)
+        conv, agree, rewards = dialog.run(entity, ctxs)
         true_reward = rewards[0] if agree else 0
         reward_list.append(true_reward)
         conv_list.append(conv)

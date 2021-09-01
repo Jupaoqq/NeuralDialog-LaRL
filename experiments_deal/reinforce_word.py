@@ -12,7 +12,6 @@ from latent_dialog.main import Reinforce
 from latent_dialog.agent_deal import RlAgent, LstmAgent
 from latent_dialog.dialog_deal import Dialog, DialogEval
 from latent_dialog.domain import ContextGenerator, ContextGeneratorEval
-
 from FB.models.dialog_model import DialogModel as FbDialogModel
 from FB.data import WordCorpus as FbWordCorpus
 from FB.utils import use_cuda as FB_use_cuda
@@ -25,9 +24,10 @@ def main():
 
     # RL configuration
     env = 'gpu'
-    epoch_id = '23'
-    folder = '2019-06-20-09-19-39-sl_word'
-    simulator_folder = '2019-06-20-09-19-39-sl_word'
+    epoch_id_sys = '42'
+    folder = '2021-08-29-23-42-15-sl_word'
+    epoch_id_usr = '41'
+    simulator_folder = '2021-08-30-01-33-55-sl_word'
     exp_dir = os.path.join('config_log_model', folder, 'rl-' + start_time)
     if not os.path.exists(exp_dir):
         os.mkdir(exp_dir)
@@ -38,10 +38,11 @@ def main():
         test_path='../data/negotiate/test.txt',
         selfplay_path='../data/negotiate/selfplay.txt',
         selfplay_eval_path='../data/negotiate/selfplay_eval.txt',
+        entity_path='../data/negotiate/entity.txt',
         sim_config_path=os.path.join('config_log_model', simulator_folder, 'config.json'),
-        sim_model_path=os.path.join('config_log_model', simulator_folder, '{}-model'.format(epoch_id)),
+        sim_model_path=os.path.join('config_log_model', simulator_folder, '{}-model'.format(epoch_id_usr)),
         sv_config_path=os.path.join('config_log_model', folder, 'config.json'),
-        sv_model_path=os.path.join('config_log_model', folder, '{}-model'.format(epoch_id)),
+        sv_model_path=os.path.join('config_log_model', folder, '{}-model'.format(epoch_id_sys)),
         rl_config_path=os.path.join(exp_dir, 'rl_config.json'),
         rl_model_path=os.path.join(exp_dir, 'rl_model'),
         ppl_best_model_path=os.path.join(exp_dir, 'ppl_best_model'),
@@ -103,27 +104,27 @@ def main():
     usr_type = LstmAgent
     usr = usr_type(usr_model, corpus, rl_config, name='User')
 
-    # load FB judger model
-    judger_config = Pack(json.load(open(rl_config.judger_config_path)))
-    judger_config['cuda'] = rl_config.use_gpu
-    judger_config['data'] = '../data/negotiate'
-    judger_device_id = FB_use_cuda(judger_config.cuda)
-    judger_word_corpus = FbWordCorpus(judger_config.data, freq_cutoff=judger_config.unk_threshold, verbose=True)
-    judger_model = FbDialogModel(judger_word_corpus.word_dict, judger_word_corpus.item_dict,
-                                 judger_word_corpus.context_dict, judger_word_corpus.output_length,
-                                 judger_config, judger_device_id)
-    if judger_device_id is not None:
-        judger_model.cuda(judger_device_id)
-    judger_model.load_state_dict(th.load(rl_config.judger_model_path, map_location=lambda storage, location: storage))
-    judger_model.eval()
-    judger = Judger(judger_model, judger_device_id)
+    # # load FB judger model
+    # judger_config = Pack(json.load(open(rl_config.judger_config_path)))
+    # judger_config['cuda'] = rl_config.use_gpu
+    # judger_config['data'] = './data/negotiate'
+    # judger_device_id = FB_use_cuda(judger_config.cuda)
+    # judger_word_corpus = FbWordCorpus(judger_config.data, freq_cutoff=judger_config.unk_threshold, verbose=True)
+    # judger_model = FbDialogModel(judger_word_corpus.word_dict, judger_word_corpus.item_dict,
+    #                              judger_word_corpus.context_dict, judger_word_corpus.output_length,
+    #                              judger_config, judger_device_id)
+    # if judger_device_id is not None:
+    #     judger_model.cuda(judger_device_id)
+    # judger_model.load_state_dict(th.load(rl_config.judger_model_path, map_location=lambda storage, location: storage))
+    # judger_model.eval()
+    # judger = Judger(judger_model, judger_device_id)
 
     # initialize communication dialogue between two agents
-    dialog = Dialog([sys, usr], judger, rl_config)
+    dialog = Dialog([sys, usr], rl_config)
     ctx_gen = ContextGenerator(rl_config.selfplay_path)
 
     # simulation module
-    dialog_eval = DialogEval([sys, usr], judger, rl_config)
+    dialog_eval = DialogEval([sys, usr], rl_config)
     ctx_gen_eval = ContextGeneratorEval(rl_config.selfplay_eval_path)
 
     # start RL

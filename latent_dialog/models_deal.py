@@ -161,6 +161,7 @@ class GaussHRED(BaseModel):
         self.sys_id = self.vocab_dict[SYS]
         self.eos_id = self.vocab_dict[EOS]
         self.pad_id = self.vocab_dict[PAD]
+        
         self.simple_posterior = config.simple_posterior
 
         self.goal_encoder = MlpGoalEncoder(goal_vocab_size=self.goal_vocab_size,

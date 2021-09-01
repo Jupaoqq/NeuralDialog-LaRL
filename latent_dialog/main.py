@@ -51,6 +51,8 @@ class LossManager(object):
         self.backward_losses = []
 
     def add_backward_loss(self, loss):
+
+
         self.backward_losses.append(loss.item())
 
     def avg_loss(self):
@@ -89,6 +91,8 @@ class Reinforce(object):
         self.validate_func = validate
         self.evaluator = evaluators.BleuEvaluator('Deal')
         self.generate_func = generate
+        with open(rl_config.entity_path) as f:
+            self.entity = [line.rstrip() for line in f]
 
 
     def run(self):
@@ -98,51 +102,52 @@ class Reinforce(object):
 
         # BEFORE RUN, RECORD INITIAL PERFORMANCE
         self.record_func(n, self.sys_model, self.test_data, self.sv_config, self.usr_model, self.ppl_exp_file,
-                         self.dialog_eval, self.ctx_gen_eval, self.rl_exp_file)
+                         self.dialog_eval, self.ctx_gen_eval, self.rl_exp_file, self.entity)
 
         for ctxs in self.ctx_gen.iter(self.rl_config.nepoch):
             n += 1
             if n % 20 == 0:
                 print('='*15, '{}/{}'.format(n, self.ctx_gen.total_size(self.rl_config.nepoch)))
 
-            # supervised learning
-            if self.rl_config.sv_train_freq > 0 and n % self.rl_config.sv_train_freq == 0:
-                # print('-'*15, 'Supervised Learning', '-'*15)
-                self.train_func(self.sys_model, self.train_data, self.sv_config)
+            # # supervised learning
+            # if self.rl_config.sv_train_freq > 0 and n % self.rl_config.sv_train_freq == 0:
+            #     # print('-'*15, 'Supervised Learning', '-'*15)
+            #     self.train_func(self.sys_model, self.train_data, self.sv_config)
                 # print('-'*40)
 
             # roll out and learn
-            _, agree, rl_reward, rl_stats = self.dialog.run(ctxs, verbose=n % self.rl_config.record_freq == 0)
+            self.dialog.run(ctxs, self.entity, verbose=True)
+            # print("finished")
 
-            # record model performance in terms of several evaluation metrics
-            if self.rl_config.record_freq > 0 and n % self.rl_config.record_freq == 0:
-                # TEST ON TRAINING DATA
-                rl_stats = validate_rl(self.dialog_eval, self.ctx_gen, num_episode=400)
-                self.learning_exp_file.write('{}\t{}\t{}\t{}\n'.format(n, rl_stats['sys_rew'],
-                                                                       rl_stats['avg_agree'],
-                                                                       rl_stats['sys_unique']))
-                self.learning_exp_file.flush()
-                aver_reward = rl_stats['sys_rew']
+            # # record model performance in terms of several evaluation metrics
+            # if self.rl_config.record_freq > 0 and n % self.rl_config.record_freq == 0:
+            #     # TEST ON TRAINING DATA
+            #     rl_stats = validate_rl(self.dialog_eval, self.ctx_gen, self.entity, num_episode=400)
+            #     self.learning_exp_file.write('{}\t{}\t{}\t{}\n'.format(n, rl_stats['sys_rew'],
+            #                                                            rl_stats['avg_agree'],
+            #                                                            rl_stats['sys_unique']))
+            #     self.learning_exp_file.flush()
+            #     aver_reward = rl_stats['sys_rew']
 
-                # TEST ON HELD-HOLD DATA
-                print('-'*15, 'Recording start', '-'*15)
-                self.record_func(n, self.sys_model, self.test_data, self.sv_config, self.usr_model, self.ppl_exp_file,
-                                 self.dialog_eval, self.ctx_gen_eval, self.rl_exp_file)
+            #     # TEST ON HELD-HOLD DATA
+            #     print('-'*15, 'Recording start', '-'*15)
+            #     self.record_func(n, self.sys_model, self.test_data, self.sv_config, self.usr_model, self.ppl_exp_file,
+            #                      self.dialog_eval, self.ctx_gen_eval, self.rl_exp_file, self.entity)
 
-                # SAVE MODEL BASED on REWARD
-                if aver_reward > best_rl_reward:
-                    print('[INFO] Update on reward in Epsd {} ({} > {})'.format(n, aver_reward, best_rl_reward))
-                    th.save(self.sys_model.state_dict(), self.rl_config.reward_best_model_path)
-                    best_rl_reward = aver_reward
-                else:
-                    print('[INFO] No update on reward in Epsd {} ({} < {})'.format(n, aver_reward, best_rl_reward))
+            #     # SAVE MODEL BASED on REWARD
+            #     if aver_reward > best_rl_reward:
+            #         print('[INFO] Update on reward in Epsd {} ({} > {})'.format(n, aver_reward, best_rl_reward))
+            #         th.save(self.sys_model.state_dict(), self.rl_config.reward_best_model_path)
+            #         best_rl_reward = aver_reward
+            #     else:
+            #         print('[INFO] No update on reward in Epsd {} ({} < {})'.format(n, aver_reward, best_rl_reward))
 
-                print('-'*15, 'Recording end', '-'*15)
+            #     print('-'*15, 'Recording end', '-'*15)
 
-            # print('='*15, 'Episode {} end'.format(n), '='*15)
-            if self.rl_config.nepisode > 0 and n > self.rl_config.nepisode:
-                print('-'*15, 'Stop from config', '-'*15)
-                break
+            # # print('='*15, 'Episode {} end'.format(n), '='*15)
+            # if self.rl_config.nepisode > 0 and n > self.rl_config.nepisode:
+            #     print('-'*15, 'Stop from config', '-'*15)
+            #     break
 
         print("$$$ Load {}-model".format(self.rl_config.reward_best_model_path))
         self.sv_config.batch_size = 32
@@ -234,7 +239,7 @@ class OfflineTaskReinforce(object):
 
                     # supervised learning
                     if self.rl_config.sv_train_freq > 0 and n % self.rl_config.sv_train_freq == 0:
-                        self.train_func(self.sys_model, self.sl_train_data, self.sv_config)
+                        self.cctrain_func(self.sys_model, self.sl_train_data, self.sv_config)
 
                     # record model performance in terms of several evaluation metrics
                     if self.rl_config.record_freq > 0 and n % self.rl_config.record_freq == 0:
@@ -285,7 +290,7 @@ class OfflineTaskReinforce(object):
             self.generate_func(self.sys_model, self.test_data, self.sv_config, self.evaluator, num_batch=None, dest_f=f)
 
 
-def validate_rl(dialog_eval, ctx_gen, num_episode=200):
+def validate_rl(dialog_eval, ctx_gen, entity, num_episode=200):
     print("Validate on training goals for {} episode".format(num_episode))
     reward_list = []
     agree_list = []
@@ -293,7 +298,7 @@ def validate_rl(dialog_eval, ctx_gen, num_episode=200):
     word_metric = UniquenessWordMetric()
     for _ in range(num_episode):
         ctxs = ctx_gen.sample()
-        conv, agree, rewards = dialog_eval.run(ctxs)
+        conv, agree, rewards = dialog_eval.run(entity, ctxs)
         true_reward = rewards[0] if agree else 0
         reward_list.append(true_reward)
         agree_list.append(float(agree if agree is not None else 0.0))
@@ -344,7 +349,6 @@ def task_train_single_batch(model, train_data, config):
         model.backward(loss, batch_cnt)
         nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
         optimizer.step()
-
 
 def train(model, train_data, val_data, test_data, config, evaluator, gen=None):
     patience = 10

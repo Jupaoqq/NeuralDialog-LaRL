@@ -73,8 +73,11 @@ class LstmAgent(Agent):
         self.lang_h = None
 
     def feed_context(self, context):
-        self.context = context
-        context_id = np.array(self.corpus.goal2id(context))
+        self.context = context[0:6]
+        # print(self.context)
+        self.movie = context[7:]
+        # print(self.movie)
+        context_id = np.array(self.corpus.goal2id(self.context))
         context_var = self.model.np2var(context_id, LONG).unsqueeze(0) # (1, goal_len)
         self.goal_h = self.model.goal_encoder(context_var) # (1, goal_nhid)
 
@@ -83,6 +86,7 @@ class LstmAgent(Agent):
         # self.lang_is = [] # max_dlg_len*(1, 1, num_direction*utt_cell_size)
         self.lang_os = [] # max_dlg_len*(1, 1, dlg_cell_size)
         self.lang_h = None # tuple: (h, c)
+
 
         self.token_embed = [] # max_dlg_len*(1, max_utt_len, embedding_dim+1)
         self.token_feat  = [] # max_dlg_len*(1, max_utt_len, num_directions*utt_cell_size)
@@ -267,8 +271,11 @@ class LatentAgent(Agent):
         self.lang_h = None
 
     def feed_context(self, context):
-        self.context = context
-        context_id = np.array(self.corpus.goal2id(context))
+        self.context = context[0:6]
+        # print(self.context)
+        self.movie = context[7:]
+        # print(self.movie)
+        context_id = np.array(self.corpus.goal2id(self.context))
         context_var = self.model.np2var(context_id, LONG).unsqueeze(0) # (1, goal_len)
         self.goal_h = self.model.goal_encoder(context_var) # (1, goal_nhid)
 

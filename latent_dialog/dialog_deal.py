@@ -3,14 +3,14 @@ from latent_dialog import domain
 from latent_dialog.metric import MetricsContainer
 from latent_dialog.utils import read_lines
 from latent_dialog.corpora import EOS, SEL
+from latent_dialog import evaluators
 
 
 class Dialog(object):
     """Dialogue runner."""
-    def __init__(self, agents, judger, args):
+    def __init__(self, agents, args):
         assert len(agents) == 2
         self.agents = agents
-        self.judger = judger
         self.args = args
         self.domain = domain.get_domain(args.domain)
         self.metrics = MetricsContainer()
@@ -38,7 +38,7 @@ class Dialog(object):
     def show_metrics(self):
         return ' '.join(['%s=%s' % (k, v) for k, v in self.metrics.dict().items()])
 
-    def run(self, ctxs, verbose=True):
+    def run(self, ctxs, entity, verbose=True):
         """Runs one instance of the dialogue."""
         assert len(self.agents) == len(ctxs)
         # initialize agents by feeding in the context
@@ -81,6 +81,9 @@ class Dialog(object):
             # make the other agent to read it
             reader.read(out)
             # check if the end of the conversation was generated
+            if nturn > 15:
+                break
+
             if self._is_selection(out_words) and first_turn:
                 self.metrics.record('%s_sel' % writer.name, 1)
                 self.metrics.record('%s_sel' % reader.name, 0)
@@ -88,69 +91,75 @@ class Dialog(object):
             writer, reader = reader, writer
             first_turn = True
             if self.args.max_nego_turn > 0 and nturn >= self.args.max_nego_turn:
-                return [], None, [0, 0], None
+                return []
 
-        choices = []
-        # generate choices for each of the agents
-        for agent in self.agents:
-            agent.transform_dialogue_history()
-            # print('\t{} context = {}'.format(agent.name, agent.context))
-            # print('\t{} dialogue_text = {}'.format(agent.name, agent.dialogue_text))
-            choice = self.judger.choose(agent.context, agent.dialogue_text)
-            # print('\t{} choice = {}'.format(agent.name, choice))
-            choices.append(choice)
+        # choices = []
+        # rewards = []
+        # # generate choices for each of the agents
+        # for agent in self.agents:
+        #     agent.transform_dialogue_history()
+        #     r = 0
+        #     for i in entity:
+        #         if i in agent.dialogue_text:
+        #             r = r + 1
+        #     if r > 0:
+        #         print(agent.dialogue_text)
+        #     rewards.append(r)
+        #     # print('\t{} context = {}'.format(agent.name, agent.context))
+        #     # print('\t{} dialogue_text = {}'.format(agent.name, agent.dialogue_text))
+        #     # choice = self.judger.choose(agent.context, agent.dialogue_text)
+        #     # print('\t{} choice = {}'.format(agent.name, choice))
+        #     # choices.append(choice)
 
-        # print('conv = {}'.format(conv))
-        # evaluate the choices, produce agreement and a reward
-        agree, rewards = self.domain.score_choices(choices, ctxs)
+        # # print('conv = {}'.format(conv))
+        # # evaluate the choices, produce agreement and a reward
+        # agree = None
 
-        if verbose:
-            print('ctxs = {}'.format(ctxs))
-            print('choices = {}'.format(choices))
-            print('agree = {}'.format(agree))
-            print('rewards = {}'.format(rewards))
+        # if verbose:
+        #     print('ctxs = {}'.format(ctxs))
+        #     print('rewards = {}'.format(rewards))
 
-        # perform update, in case if any of the agents is learnable
-        for agent, reward in zip(self.agents, rewards):
-            agent.update(agree, reward)
+        # # perform update, in case if any of the agents is learnable
+        # for agent, reward in zip(self.agents, rewards):
+        #     agent.update(agree, reward)
 
-        if agree:
-            self.metrics.record('advantage', rewards[0] - rewards[1])
+        # if agree:
+        #     self.metrics.record('advantage', rewards[0] - rewards[1])
 
-        if agree is None:
-            agree = False
+        # if agree is None:
+        #     agree = False
 
-        self.metrics.record('time')
-        self.metrics.record('dialog_len', len(conv))
-        self.metrics.record('agree', int(agree))
-        self.metrics.record('comb_rew', np.sum(rewards) if agree else 0)
-        for agent, reward in zip(self.agents, rewards):
-            self.metrics.record('%s_rew' % agent.name, reward if agree else 0)
-        if verbose:
-            print('='*50)
-            print(self.show_metrics())
-            print('='*50)
+        # self.metrics.record('time')
+        # self.metrics.record('dialog_len', len(conv))
+        # self.metrics.record('agree', int(agree))
+        # self.metrics.record('comb_rew', np.sum(rewards) if agree else 0)
+        # for agent, reward in zip(self.agents, rewards):
+        #     self.metrics.record('%s_rew' % agent.name, reward if agree else 0)
+        # if verbose:
 
-        stats = dict()
-        stats['system_rew'] = self.metrics.metrics['system_rew'].show()
-        stats['system_unique'] = self.metrics.metrics['system_unique'].show()
-        stats['avg_agree'] = self.metrics.metrics['agree'].show()
+        #     print('='*50)
+        #     print(self.show_metrics())
+        #     print('='*50)
 
-        return conv, agree, rewards, stats
+        # stats = dict()
+        # stats['system_rew'] = self.metrics.metrics['system_rew'].show()
+        # stats['system_unique'] = self.metrics.metrics['system_unique'].show()
+        # stats['avg_agree'] = self.metrics.metrics['agree'].show()
+
+        return conv
 
 
 class DialogEval(object):
-    def __init__(self, agents, judger, args):
+    def __init__(self, agents, args):
         assert len(agents) == 2
         self.agents = agents
-        self.judger = judger
         self.args = args
         self.domain = domain.get_domain(args.domain)
 
     def _is_selection(self, out):
         return len(out) == 2 and out[0] == SEL and out[1] == EOS
 
-    def run(self, ctxs):
+    def run(self, entity, ctxs):
         assert len(self.agents) == len(ctxs)
         # initialize agents by feeding in the context
         for agent, ctx in zip(self.agents, ctxs):
@@ -189,18 +198,28 @@ class DialogEval(object):
                 return [], None, [0, 0]
 
         choices = []
+        rewards = []
         # generate choices for each of the agents
         for agent in self.agents:
             agent.transform_dialogue_history()
-            choice = self.judger.choose(agent.context, agent.dialogue_text)
-            choices.append(choice)
+            # choice = self.judger.choose(agent.context, agent.dialogue_text)
+            # choices.append(choice)
+            r = 0
+            for i in entity:
+                if i in agent.dialogue_text:
+                    r = r + 1
+            if r > 0:
+                print(agent.dialogue_text)
+            rewards.append(r)
 
+        agree = None
 
         # print('ctxs = {}'.format(ctxs))
         # print('choices = {}'.format(choices))
         # evaluate the choices, produce agreement and a reward
-        agree, rewards = self.domain.score_choices(choices, ctxs)
+        # agree, rewards = self.domain.score_choices(choices, ctxs)
         # print('agree = {}'.format(agree))
         # print('rewards = {}'.format(rewards))
+        
 
         return conv, agree, rewards

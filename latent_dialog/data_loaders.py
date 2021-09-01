@@ -18,7 +18,7 @@ class DealDataLoaders(BaseDataLoaders):
         for dlg in data:
             goal = dlg.goal
             for i in range(1, len(dlg.dlg)):
-                if dlg.dlg[i].speaker == USR:
+                if dlg.dlg[i].speaker == SYS:
                     continue
                 e_idx = i
                 s_idx = max(0, e_idx - backward_size)
@@ -28,7 +28,7 @@ class DealDataLoaders(BaseDataLoaders):
                 for turn in dlg.dlg[s_idx: e_idx]:
                     turn['utt'] = self.pad_to(self.max_utt_len, turn.utt, do_pad=False)
                     context.append(turn)
-                results.append(Pack(context=context, response=response, goal=goal))
+                results.append(Pack(context=context, response=response, goal=goal, movie = dlg.movie))
         return results
 
     def epoch_init(self, config, shuffle=True, verbose=True, fix_batch=False):
@@ -40,9 +40,10 @@ class DealDataLoaders(BaseDataLoaders):
         ctx_utts, ctx_lens = [], []
         out_utts, out_lens = [], []
         goals, goal_lens = [], []
+        movie = []
 
         for row in rows:
-            in_row, out_row, goal_row = row.context, row.response, row.goal
+            in_row, out_row, goal_row, movie_row = row.context, row.response, row.goal, row.movie
 
             # source context
             batch_ctx = []
@@ -59,6 +60,9 @@ class DealDataLoaders(BaseDataLoaders):
             # goal
             goals.append(goal_row)
             goal_lens.append(len(goal_row))
+
+            # movie
+            movie.append(movie_row)
 
         vec_ctx_lens = np.array(ctx_lens) # (batch_size, ), number of turns
         max_ctx_len = np.max(vec_ctx_lens)
@@ -86,7 +90,8 @@ class DealDataLoaders(BaseDataLoaders):
                     context_confs=vec_ctx_confs, \
                     output_lens=vec_out_lens, \
                     outputs=vec_out_utts, \
-                    goals=vec_goals)
+                    goals=vec_goals, \
+                    movies=movie)
 
 
 class BeliefDbDataLoaders(BaseDataLoaders):
