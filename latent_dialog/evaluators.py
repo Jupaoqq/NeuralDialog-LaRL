@@ -7,7 +7,6 @@ from nltk.util import ngrams
 from latent_dialog.corpora import SYS, USR, BOS, EOS
 import json
 from latent_dialog.normalizer.delexicalize import normalize
-import sqlite3
 import os
 import random
 import logging

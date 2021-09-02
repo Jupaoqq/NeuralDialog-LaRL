@@ -113,41 +113,43 @@ class Reinforce(object):
             # if self.rl_config.sv_train_freq > 0 and n % self.rl_config.sv_train_freq == 0:
             #     # print('-'*15, 'Supervised Learning', '-'*15)
             #     self.train_func(self.sys_model, self.train_data, self.sv_config)
-                # print('-'*40)
+                # print('-'*40)c
 
             # roll out and learn
-            self.dialog.run(ctxs, self.entity, verbose=True)
+
+            # self.dialog.run(ctxs, self.entity, verbose=True)
+            _, agree, rl_reward, rl_stats = self.dialog.run(ctxs, self.entity, verbose=n % self.rl_config.record_freq == 0)
             # print("finished")
 
-            # # record model performance in terms of several evaluation metrics
-            # if self.rl_config.record_freq > 0 and n % self.rl_config.record_freq == 0:
-            #     # TEST ON TRAINING DATA
-            #     rl_stats = validate_rl(self.dialog_eval, self.ctx_gen, self.entity, num_episode=400)
-            #     self.learning_exp_file.write('{}\t{}\t{}\t{}\n'.format(n, rl_stats['sys_rew'],
-            #                                                            rl_stats['avg_agree'],
-            #                                                            rl_stats['sys_unique']))
-            #     self.learning_exp_file.flush()
-            #     aver_reward = rl_stats['sys_rew']
+            # record model performance in terms of several evaluation metrics
+            if self.rl_config.record_freq > 0 and n % self.rl_config.record_freq == 0:
+                # TEST ON TRAINING DATA
+                rl_stats = validate_rl(self.dialog_eval, self.ctx_gen, self.entity, num_episode=400)
+                self.learning_exp_file.write('{}\t{}\t{}\t{}\n'.format(n, rl_stats['sys_rew'],
+                                                                       rl_stats['avg_agree'],
+                                                                       rl_stats['sys_unique']))
+                self.learning_exp_file.flush()
+                aver_reward = rl_stats['sys_rew']
 
-            #     # TEST ON HELD-HOLD DATA
-            #     print('-'*15, 'Recording start', '-'*15)
-            #     self.record_func(n, self.sys_model, self.test_data, self.sv_config, self.usr_model, self.ppl_exp_file,
-            #                      self.dialog_eval, self.ctx_gen_eval, self.rl_exp_file, self.entity)
+                # TEST ON HELD-HOLD DATA
+                print('-'*15, 'Recording start', '-'*15)
+                self.record_func(n, self.sys_model, self.test_data, self.sv_config, self.usr_model, self.ppl_exp_file,
+                                 self.dialog_eval, self.ctx_gen_eval, self.rl_exp_file, self.entity)
 
-            #     # SAVE MODEL BASED on REWARD
-            #     if aver_reward > best_rl_reward:
-            #         print('[INFO] Update on reward in Epsd {} ({} > {})'.format(n, aver_reward, best_rl_reward))
-            #         th.save(self.sys_model.state_dict(), self.rl_config.reward_best_model_path)
-            #         best_rl_reward = aver_reward
-            #     else:
-            #         print('[INFO] No update on reward in Epsd {} ({} < {})'.format(n, aver_reward, best_rl_reward))
+                # SAVE MODEL BASED on REWARD
+                if aver_reward > best_rl_reward:
+                    print('[INFO] Update on reward in Epsd {} ({} > {})'.format(n, aver_reward, best_rl_reward))
+                    th.save(self.sys_model.state_dict(), self.rl_config.reward_best_model_path)
+                    best_rl_reward = aver_reward
+                else:
+                    print('[INFO] No update on reward in Epsd {} ({} < {})'.format(n, aver_reward, best_rl_reward))
 
-            #     print('-'*15, 'Recording end', '-'*15)
+                print('-'*15, 'Recording end', '-'*15)
 
-            # # print('='*15, 'Episode {} end'.format(n), '='*15)
-            # if self.rl_config.nepisode > 0 and n > self.rl_config.nepisode:
-            #     print('-'*15, 'Stop from config', '-'*15)
-            #     break
+            # print('='*15, 'Episode {} end'.format(n), '='*15)
+            if self.rl_config.nepisode > 0 and n > self.rl_config.nepisode:
+                print('-'*15, 'Stop from config', '-'*15)
+                break
 
         print("$$$ Load {}-model".format(self.rl_config.reward_best_model_path))
         self.sv_config.batch_size = 32

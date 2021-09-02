@@ -94,59 +94,73 @@ class Dialog(object):
                 return []
 
         # choices = []
-        # rewards = []
-        # # generate choices for each of the agents
-        # for agent in self.agents:
-        #     agent.transform_dialogue_history()
-        #     r = 0
-        #     for i in entity:
-        #         if i in agent.dialogue_text:
-        #             r = r + 1
-        #     if r > 0:
-        #         print(agent.dialogue_text)
-        #     rewards.append(r)
-        #     # print('\t{} context = {}'.format(agent.name, agent.context))
-        #     # print('\t{} dialogue_text = {}'.format(agent.name, agent.dialogue_text))
-        #     # choice = self.judger.choose(agent.context, agent.dialogue_text)
-        #     # print('\t{} choice = {}'.format(agent.name, choice))
-        #     # choices.append(choice)
+        rewards = []
 
-        # # print('conv = {}'.format(conv))
-        # # evaluate the choices, produce agreement and a reward
-        # agree = None
+        # generate choices for each of the agents
+        for agent in self.agents:
+            r = 0
+            agent.transform_dialogue_history()
+            if agent.name == "System":
+                for i in entity:
+                    if i in agent.dialogue_text:
+                        r = 1
+                if r > 0:
+                    print(agent.dialogue_text)
+                rewards.append(r)
+            elif agent.name == "User":
+                for key, a in self.movie.items():
+                    if key in agent.dialogue_text:
+                        if a['liked'] == 0:
+                            r = -1
+                        elif a['liked'] == 1:
+                            r = 1
+                        elif a['seen'] == 1:
+                            r = 0.5
+                if r > 0:
+                    print(agent.dialogue_text)
+                rewards.append(r)
+            # print('\t{} context = {}'.format(agent.name, agent.context))
+            # print('\t{} dialogue_text = {}'.format(agent.name, agent.dialogue_text))
+            # choice = self.judger.choose(agent.context, agent.dialogue_text)
+            # print('\t{} choice = {}'.format(agent.name, choice))
+            # choices.append(choice)
 
-        # if verbose:
-        #     print('ctxs = {}'.format(ctxs))
-        #     print('rewards = {}'.format(rewards))
+        # print('conv = {}'.format(conv))
+        # evaluate the choices, produce agreement and a reward
+        agree = None
 
-        # # perform update, in case if any of the agents is learnable
-        # for agent, reward in zip(self.agents, rewards):
-        #     agent.update(agree, reward)
+        if verbose:
+            print('ctxs = {}'.format(ctxs))
+            print('rewards = {}'.format(rewards))
 
-        # if agree:
-        #     self.metrics.record('advantage', rewards[0] - rewards[1])
+        # perform update, in case if any of the agents is learnable
+        for agent, reward in zip(self.agents, rewards):
+            agent.update(agree, reward)
 
-        # if agree is None:
-        #     agree = False
+        if agree:
+            self.metrics.record('advantage', rewards[0] - rewards[1])
 
-        # self.metrics.record('time')
-        # self.metrics.record('dialog_len', len(conv))
-        # self.metrics.record('agree', int(agree))
-        # self.metrics.record('comb_rew', np.sum(rewards) if agree else 0)
-        # for agent, reward in zip(self.agents, rewards):
-        #     self.metrics.record('%s_rew' % agent.name, reward if agree else 0)
-        # if verbose:
+        if agree is None:
+            agree = False
 
-        #     print('='*50)
-        #     print(self.show_metrics())
-        #     print('='*50)
+        self.metrics.record('time')
+        self.metrics.record('dialog_len', len(conv))
+        self.metrics.record('agree', int(agree))
+        self.metrics.record('comb_rew', np.sum(rewards) if agree else 0)
+        for agent, reward in zip(self.agents, rewards):
+            self.metrics.record('%s_rew' % agent.name, reward if agree else 0)
+        if verbose:
 
-        # stats = dict()
-        # stats['system_rew'] = self.metrics.metrics['system_rew'].show()
-        # stats['system_unique'] = self.metrics.metrics['system_unique'].show()
-        # stats['avg_agree'] = self.metrics.metrics['agree'].show()
+            print('='*50)
+            print(self.show_metrics())
+            print('='*50)
 
-        return conv
+        stats = dict()
+        stats['system_rew'] = self.metrics.metrics['system_rew'].show()
+        stats['system_unique'] = self.metrics.metrics['system_unique'].show()
+        stats['avg_agree'] = self.metrics.metrics['agree'].show()
+
+        return conv, agree, rewards
 
 
 class DialogEval(object):
@@ -197,21 +211,33 @@ class DialogEval(object):
             if self.args.max_nego_turn > 0 and nturn >= self.args.max_nego_turn:
                 return [], None, [0, 0]
 
-        choices = []
+        # choices = []
         rewards = []
+
         # generate choices for each of the agents
         for agent in self.agents:
-            agent.transform_dialogue_history()
-            # choice = self.judger.choose(agent.context, agent.dialogue_text)
-            # choices.append(choice)
             r = 0
-            for i in entity:
-                if i in agent.dialogue_text:
-                    r = r + 1
-            if r > 0:
-                print(agent.dialogue_text)
-            rewards.append(r)
-
+            agent.transform_dialogue_history()
+            if agent.name == "System":
+                for i in entity:
+                    if i in agent.dialogue_text:
+                        r = 1
+                if r > 0:
+                    print(agent.dialogue_text)
+                rewards.append(r)
+            elif agent.name == "User":
+                for key, a in self.movie.items():
+                    if key in agent.dialogue_text:
+                        if a['liked'] == 0:
+                            r = -1
+                        elif a['liked'] == 1:
+                            r = 1
+                        elif a['seen'] == 1:
+                            r = 0.5
+                if r > 0:
+                    print(agent.dialogue_text)
+                rewards.append(r)
+                
         agree = None
 
         # print('ctxs = {}'.format(ctxs))

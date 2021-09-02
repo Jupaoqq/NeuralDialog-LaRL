@@ -1,7 +1,6 @@
 import time
 import os
 import sys
-
 sys.path.append('../')
 import json
 import torch as th
@@ -12,10 +11,6 @@ from latent_dialog.main import Reinforce
 from latent_dialog.agent_deal import RlAgent, LstmAgent
 from latent_dialog.dialog_deal import Dialog, DialogEval
 from latent_dialog.domain import ContextGenerator, ContextGeneratorEval
-from FB.models.dialog_model import DialogModel as FbDialogModel
-from FB.data import WordCorpus as FbWordCorpus
-from FB.utils import use_cuda as FB_use_cuda
-from latent_dialog.judgment import Judger
 
 
 def main():

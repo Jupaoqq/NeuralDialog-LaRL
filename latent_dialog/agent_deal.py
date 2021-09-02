@@ -75,7 +75,13 @@ class LstmAgent(Agent):
     def feed_context(self, context):
         self.context = context[0:6]
         # print(self.context)
-        self.movie = context[7:]
+        self.movie_temp = context[7:]
+        movie = dict()
+        for i in range(len(movie_temp/3)):
+            movie[movie_temp[i*3]] = {}
+            movie[movie_temp[i*3]]['seen'] = movie_temp[i*3+1]
+            movie[movie_temp[i*3]]['liked'] = movie_temp[i*3+2]
+        self.movie = movie
         # print(self.movie)
         context_id = np.array(self.corpus.goal2id(self.context))
         context_var = self.model.np2var(context_id, LONG).unsqueeze(0) # (1, goal_len)
@@ -273,7 +279,13 @@ class LatentAgent(Agent):
     def feed_context(self, context):
         self.context = context[0:6]
         # print(self.context)
-        self.movie = context[7:]
+        self.movie_temp = context[7:]
+        movie = dict()
+        for i in range(len(movie_temp/3)):
+            movie[movie_temp[i*3]] = {}
+            movie[movie_temp[i*3]]['seen'] = movie_temp[i*3+1]
+            movie[movie_temp[i*3]]['liked'] = movie_temp[i*3+2]
+        self.movie = movie
         # print(self.movie)
         context_id = np.array(self.corpus.goal2id(self.context))
         context_var = self.model.np2var(context_id, LONG).unsqueeze(0) # (1, goal_len)
