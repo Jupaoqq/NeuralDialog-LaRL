@@ -47,7 +47,7 @@ class Agent(object):
         """Call it after the conversation is over, to make the selection."""
         pass
 
-    def update(self, agree, reward):
+    def update(self, reward):
         """After end of each dialogue the reward will be passed back to update the parameters.
 
         agree: a boolean flag that specifies if the agents agreed on the deal.
@@ -73,15 +73,16 @@ class LstmAgent(Agent):
         self.lang_h = None
 
     def feed_context(self, context):
+        # print(context)
         self.context = context[0:6]
-        # print(self.context)
-        self.movie_temp = context[7:]
+        movie_temp = context[6:]
         movie = dict()
-        for i in range(len(movie_temp/3)):
+        for i in range(len(movie_temp)//3):
             movie[movie_temp[i*3]] = {}
             movie[movie_temp[i*3]]['seen'] = movie_temp[i*3+1]
             movie[movie_temp[i*3]]['liked'] = movie_temp[i*3+2]
         self.movie = movie
+        # print(movie)
         # print(self.movie)
         context_id = np.array(self.corpus.goal2id(self.context))
         context_var = self.model.np2var(context_id, LONG).unsqueeze(0) # (1, goal_len)
@@ -146,56 +147,6 @@ class LstmAgent(Agent):
             self.dialogue_text.append(self.corpus.id2sent(turn))
         return self.dialogue_text 
 
-    def _choose(self, token_embed=None, token_feat=None, turn_feat=None, sample=False):
-
-        dlg_hist = self.transform_dialogue_history()
-        print('name = {}'.format(self.name))
-        print('dlg_hist = {}'.format(dlg_hist))
-
-        # get all the possible choices
-        choices = self.domain.generate_choices(self.context)
-        # concatenate the list of the hidden states into one tensor
-        # lang_is = lang_is if lang_is is not None else th.cat(self.lang_is, 1) # (1, max_dlg_len, num_direction*utt_cell_size)
-        # lang_os = lang_os if lang_os is not None else th.cat(self.lang_os, 1) # (1, max_dlg_len, dlg_cell_size)
-        token_embed = token_embed if token_embed is not None else th.cat(self.token_embed, 1)
-        token_feat = token_feat if token_feat is not None else th.cat(self.token_feat, 1)
-        turn_feat = turn_feat if turn_feat is not None else th.cat(self.turn_feat, 1)
-
-        # attn_outs = self.model.gru_attn_encoder(lang_is, lang_os) # (1, 2*nhid_attn)
-        attn_outs = self.model.gru_attn_encoder(token_embed, token_feat, turn_feat) # (1, 2*nhid_attn)
-        proj_outs = self.model.feat_projecter(self.goal_h, attn_outs) # (1, nhid_sel)
-        sel_outs = self.model.sel_classifier(proj_outs).squeeze(0) # (outcome_len, outcome_vocab_size)
-        sel_outs = [sel_outs[i] for i in range(sel_outs.size(0))] # outcome_len*(outcome_vocab_size, )
-
-        choices_logits = [] # outcome_len*(option_amount, 1)
-        for i in range(self.domain.selection_length()):
-            idxs = np.array([self.model.outcome_vocab_dict[c[i]] for c in choices])
-            idxs_var = self.model.np2var(idxs, LONG) # (option_amount, )
-            choices_logits.append(th.gather(sel_outs[i], 0, idxs_var).unsqueeze(1))
-
-        choice_logit = th.sum(th.cat(choices_logits, 1), 1, keepdim=False) # (option_amount, )
-        choice_logit = choice_logit.sub(choice_logit.max().item()) # (option_amount, )
-        prob = F.softmax(choice_logit, dim=0) # (option_amount, )
-        if sample:
-            # sample a choice
-            # FIXME !!!!!!! multinomial need num_samples argument!
-            idx = prob.multinomial().detach()
-            logprob = F.log_softmax(choice_logit).gather(0, idx)
-        else:
-            # take the most probably choice
-            _, idx = prob.max(0, keepdim=True) # idx: (1, )
-            logprob = None
-
-        p_agree = prob[idx.item()]
-
-        # Pick only your choice
-        return choices[idx.item()][:self.domain.selection_length()], logprob, p_agree.item()
-
-    def choose(self):
-        choice, _, _ = self._choose()
-        return choice
-
-
 class RlAgent(LstmAgent):
     """An Agent that updates the model parameters using REINFORCE to maximize the reward."""
     def __init__(self, model, corpus, args, name):
@@ -238,8 +189,7 @@ class RlAgent(LstmAgent):
         self.read(inpt, require_speaker=False)
         return outs, self.corpus.id2sent(outs)
 
-    def update(self, agree, reward):
-        reward = reward if agree else 0
+    def update(self, reward):
         self.all_rewards.append(reward)
         # standardize the reward
         r = (reward - np.mean(self.all_rewards)) / max(1e-4, np.std(self.all_rewards))
@@ -272,20 +222,22 @@ class LatentAgent(Agent):
         self.context = None
         self.goal_h = None
         self.dlg_history = None
-        # self.lang_is = None
+        # self.lang_is = Nonec
         self.lang_os = None
         self.lang_h = None
 
     def feed_context(self, context):
+        # print(context)
         self.context = context[0:6]
-        # print(self.context)
-        self.movie_temp = context[7:]
+        movie_temp = context[6:]
+
         movie = dict()
-        for i in range(len(movie_temp/3)):
+        for i in range(len(movie_temp)//3):
             movie[movie_temp[i*3]] = {}
             movie[movie_temp[i*3]]['seen'] = movie_temp[i*3+1]
             movie[movie_temp[i*3]]['liked'] = movie_temp[i*3+2]
         self.movie = movie
+        # print(movie)
         # print(self.movie)
         context_id = np.array(self.corpus.goal2id(self.context))
         context_var = self.model.np2var(context_id, LONG).unsqueeze(0) # (1, goal_len)
@@ -336,55 +288,6 @@ class LatentAgent(Agent):
         for turn in self.dlg_history:
             self.dialogue_text.append(self.corpus.id2sent(turn))
         return self.dialogue_text
-
-    def _choose(self, token_embed=None, token_feat=None, turn_feat=None, sample=False):
-
-        dlg_hist = self.transform_dialogue_history()
-        print('name = {}'.format(self.name))
-        print('dlg_hist = {}'.format(dlg_hist))
-
-        # get all the possible choices
-        choices = self.domain.generate_choices(self.context)
-        # concatenate the list of the hidden states into one tensor
-        # lang_is = lang_is if lang_is is not None else th.cat(self.lang_is, 1) # (1, max_dlg_len, num_direction*utt_cell_size)
-        # lang_os = lang_os if lang_os is not None else th.cat(self.lang_os, 1) # (1, max_dlg_len, dlg_cell_size)
-        token_embed = token_embed if token_embed is not None else th.cat(self.token_embed, 1)
-        token_feat = token_feat if token_feat is not None else th.cat(self.token_feat, 1)
-        turn_feat = turn_feat if turn_feat is not None else th.cat(self.turn_feat, 1)
-
-        # attn_outs = self.model.gru_attn_encoder(lang_is, lang_os) # (1, 2*nhid_attn)
-        attn_outs = self.model.gru_attn_encoder(token_embed, token_feat, turn_feat) # (1, 2*nhid_attn)
-        proj_outs = self.model.feat_projecter(self.goal_h, attn_outs) # (1, nhid_sel)
-        sel_outs = self.model.sel_classifier(proj_outs).squeeze(0) # (outcome_len, outcome_vocab_size)
-        sel_outs = [sel_outs[i] for i in range(sel_outs.size(0))] # outcome_len*(outcome_vocab_size, )
-
-        choices_logits = [] # outcome_len*(option_amount, 1)
-        for i in range(self.domain.selection_length()):
-            idxs = np.array([self.model.outcome_vocab_dict[c[i]] for c in choices])
-            idxs_var = self.model.np2var(idxs, LONG) # (option_amount, )
-            choices_logits.append(th.gather(sel_outs[i], 0, idxs_var).unsqueeze(1))
-
-        choice_logit = th.sum(th.cat(choices_logits, 1), 1, keepdim=False) # (option_amount, )
-        choice_logit = choice_logit.sub(choice_logit.max().item()) # (option_amount, )
-        prob = F.softmax(choice_logit, dim=0) # (option_amount, )
-        if sample:
-            # sample a choice
-            # FIXME !!!!!!! multinomial need num_samples argument!
-            idx = prob.multinomial().detach()
-            logprob = F.log_softmax(choice_logit).gather(0, idx)
-        else:
-            # take the most probably choice
-            _, idx = prob.max(0, keepdim=True) # idx: (1, )
-            logprob = None
-
-        p_agree = prob[idx.item()]
-
-        # Pick only your choice
-        return choices[idx.item()][:self.domain.selection_length()], logprob, p_agree.item()
-
-    def choose(self):
-        choice, _, _ = self._choose()
-        return choice
 
     def write(self, max_words=None, stop_tokens=STOP_TOKENS):
         max_words = self.args.max_words if max_words is None else max_words
@@ -452,8 +355,7 @@ class LatentRlAgent(LatentAgent):
         self.read(inpt, require_speaker=False)
         return outs, self.corpus.id2sent(outs)
 
-    def update(self, agree, reward):
-        reward = reward if agree else 0
+    def update(self, reward):
         self.all_rewards.append(reward)
         # standardize the reward
         r = (reward - np.mean(self.all_rewards)) / max(1e-4, np.std(self.all_rewards))

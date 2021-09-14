@@ -20,7 +20,6 @@ class Dialog(object):
         """Registers valuable metrics."""
         self.metrics.register_average('dialog_len')
         self.metrics.register_average('sent_len')
-        self.metrics.register_percentage('agree')
         self.metrics.register_average('advantage')
         self.metrics.register_time('time')
         self.metrics.register_average('comb_rew')
@@ -108,7 +107,7 @@ class Dialog(object):
                     print(agent.dialogue_text)
                 rewards.append(r)
             elif agent.name == "User":
-                for key, a in self.movie.items():
+                for key, a in agent.movie.items():
                     if key in agent.dialogue_text:
                         if a['liked'] == 0:
                             r = -1
@@ -127,28 +126,19 @@ class Dialog(object):
 
         # print('conv = {}'.format(conv))
         # evaluate the choices, produce agreement and a reward
-        agree = None
-
         if verbose:
             print('ctxs = {}'.format(ctxs))
             print('rewards = {}'.format(rewards))
 
         # perform update, in case if any of the agents is learnable
         for agent, reward in zip(self.agents, rewards):
-            agent.update(agree, reward)
-
-        if agree:
-            self.metrics.record('advantage', rewards[0] - rewards[1])
-
-        if agree is None:
-            agree = False
+            agent.update(reward)
 
         self.metrics.record('time')
         self.metrics.record('dialog_len', len(conv))
-        self.metrics.record('agree', int(agree))
-        self.metrics.record('comb_rew', np.sum(rewards) if agree else 0)
+        self.metrics.record('comb_rew', np.sum(rewards))
         for agent, reward in zip(self.agents, rewards):
-            self.metrics.record('%s_rew' % agent.name, reward if agree else 0)
+            self.metrics.record('%s_rew' % agent.name, reward)
         if verbose:
 
             print('='*50)
@@ -158,9 +148,8 @@ class Dialog(object):
         stats = dict()
         stats['system_rew'] = self.metrics.metrics['system_rew'].show()
         stats['system_unique'] = self.metrics.metrics['system_unique'].show()
-        stats['avg_agree'] = self.metrics.metrics['agree'].show()
 
-        return conv, agree, rewards
+        return conv, rewards, stats
 
 
 class DialogEval(object):
@@ -226,7 +215,7 @@ class DialogEval(object):
                     print(agent.dialogue_text)
                 rewards.append(r)
             elif agent.name == "User":
-                for key, a in self.movie.items():
+                for key, a in agent.movie.items():
                     if key in agent.dialogue_text:
                         if a['liked'] == 0:
                             r = -1
@@ -238,7 +227,6 @@ class DialogEval(object):
                     print(agent.dialogue_text)
                 rewards.append(r)
                 
-        agree = None
 
         # print('ctxs = {}'.format(ctxs))
         # print('choices = {}'.format(choices))
@@ -248,4 +236,4 @@ class DialogEval(object):
         # print('rewards = {}'.format(rewards))
         
 
-        return conv, agree, rewards
+        return conv, rewards

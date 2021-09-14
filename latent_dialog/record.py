@@ -116,16 +116,14 @@ def record_ppl(n_epsd, model, val_data, config, ppl_f):
 def record_rl(n_epsd, dialog, ctx_gen, rl_f, entity):
     conv_list = []
     reward_list = []
-    agree_list = []
     sent_metric = UniquenessSentMetric()
     word_metric = UniquenessWordMetric()
 
     for ctxs in ctx_gen.ctxs:
-        conv, agree, rewards = dialog.run(entity, ctxs)
-        true_reward = rewards[0] if agree else 0
+        conv, rewards = dialog.run(entity, ctxs)
+        true_reward = rewards[0]
         reward_list.append(true_reward)
         conv_list.append(conv)
-        agree_list.append(float(agree) if agree is not None else 0.0)
         for turn in conv:
             if turn[0] == 'System':
                 sent_metric.record(turn[1])
@@ -133,12 +131,11 @@ def record_rl(n_epsd, dialog, ctx_gen, rl_f, entity):
 
     # json.dump(conv_list, text_f, indent=4)
     aver_reward = np.average(reward_list)
-    aver_agree = np.average(agree_list)
     unique_sent_num = sent_metric.value()
     unique_word_num = word_metric.value()
     print(sent_metric.top_n(10))
 
-    rl_f.write('{}\t{}\t{}\t{}\t{}\n'.format(n_epsd, aver_reward, aver_agree, unique_sent_num, unique_word_num))
+    rl_f.write('{}\t{}\t{}\t{}\n'.format(n_epsd, aver_reward, unique_sent_num, unique_word_num))
     rl_f.flush()
 
 
